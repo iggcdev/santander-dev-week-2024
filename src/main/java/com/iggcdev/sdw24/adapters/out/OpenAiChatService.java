@@ -1,12 +1,16 @@
 package com.iggcdev.sdw24.adapters.out;
 
 import com.iggcdev.sdw24.domain.ports.GenerativeAiService;
+import feign.RequestInterceptor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.List;
 
-@FeignClient(name = "openAiChatApi", url = "${openai.base-url}")
+@FeignClient(name = "openAiApi", url = "${openai.base-url}", configuration = OpenAiChatService.Config.class)
 public interface OpenAiChatService extends GenerativeAiService {
 
     @PostMapping("/v1/chat/completions")
@@ -30,5 +34,15 @@ public interface OpenAiChatService extends GenerativeAiService {
 
     record OpenAiChatCompletionResp(List<Choice> choices){}
     record Choice (Message message){}
+
+    class Config{
+        //A classe vai adicionar a API_KEY do header, e autorizar a integração com OPENAI
+        @Bean
+        public RequestInterceptor apiKeyRequestInterceptor(@Value("${openai.api-key}") String apiKey){
+            return requestTemplate -> requestTemplate.header(
+                    HttpHeaders.AUTHORIZATION,"Bearer %s".formatted(apiKey)
+            );
+        }
+    }
 
 }
