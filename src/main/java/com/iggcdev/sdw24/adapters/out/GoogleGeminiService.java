@@ -1,20 +1,22 @@
 package com.iggcdev.sdw24.adapters.out;
 
 import com.iggcdev.sdw24.domain.ports.GenerativeAiService;
+import feign.FeignException;
 import feign.RequestInterceptor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.List;
-
+@ConditionalOnProperty(name = "generatve-ai.provider", havingValue = "GEMINI")
 @FeignClient(name = "geminiApi", url = "${gemini.base-url}", configuration = GoogleGeminiService.Config.class)
 public interface GoogleGeminiService extends GenerativeAiService {
 
     @PostMapping("v1beta/models/gemini-pro:generateContent")
-    GoogleGeminiResp chatCompletion(GoogleGeminiReq req);
+    GoogleGeminiResp textOnlyInput(GoogleGeminiReq req);
 
     @Override
     default String genereteContent(String objective, String context){
@@ -25,7 +27,14 @@ public interface GoogleGeminiService extends GenerativeAiService {
         GoogleGeminiReq req = new GoogleGeminiReq(
                 List.of(new Content(List.of(new Part(prompt))))
         );
-        return "";
+        try {
+            GoogleGeminiResp resp = textOnlyInput(req);
+            return resp.candidates().getFirst().contents().parts().getFirst().text();
+        } catch (FeignException httpErrors){
+            return "httpError. Não foi possivel comunicação com API do Google Gemini.";
+        } catch (Exception unexpectedErrors){
+            return "Erro inesperado. Retorno da API Google Gemini não contem dados esperados.";
+        }
     }
 
     /**
@@ -38,7 +47,7 @@ public interface GoogleGeminiService extends GenerativeAiService {
      * Estruturação request abaixo:
      */
     record GoogleGeminiReq(List<Content> contents){}
-    record Content(List<Part> text){}
+    record Content(List<Part> parts){}
     record Part(String text){}
 
     /**
